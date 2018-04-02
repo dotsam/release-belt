@@ -38,4 +38,15 @@ return [
     //        'disallow' => ['bar'],
     //    ],
     // ],
+
+    //'ips'                      => [
+          // IP whitelist. (Overrides user authentication)
+    //    '127.0.0.1' => [
+              // Array of allowed package path matches.
+    //        'allow'    => ['foo'],
+
+              // Array of disallowed package path matches.
+    //        'disallow' => ['bar'],
+    //    ],
+    // ],
 ];

@@ -26,6 +26,7 @@ class Application extends \Silex\Application
         /** @deprecated 0.3:1.0 Deprecated in favor of `users`. */
         $app['http.users']  = [];
         $app['users']       = [];
+        $app['ips']       = [];
         $app['release.dir'] = __DIR__.'/../releases';
         $app['finder']      = function () {
             $finder = new Finder();

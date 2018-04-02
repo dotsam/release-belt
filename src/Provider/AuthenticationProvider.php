@@ -8,6 +8,7 @@ use Silex\Api\BootableProviderInterface;
 use Silex\Application;
 use Symfony\Component\Finder\Finder;
 use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\HttpFoundation\RequestMatcher;
 
 class AuthenticationProvider implements ServiceProviderInterface, BootableProviderInterface
 {
@@ -18,30 +19,48 @@ class AuthenticationProvider implements ServiceProviderInterface, BootableProvid
 
     public function boot(Application $app)
     {
+        $firewalls = [];
         $userHashes = $this->getUserHashes($app);
+        $ipWhitelist = array_keys($app['ips']);
 
-        if (empty($userHashes)) {
-            return;
+        if (!empty($ipWhitelist)) {
+            $firewalls['composer_ip_whitelist'] = [
+                'pattern' => new RequestMatcher('^.*$', null, null, $ipWhitelist),
+            ];
         }
 
-        $app['security.firewalls'] = [
-            'composer' => [
+        if (!empty($userHashes)) {
+            $firewalls['composer'] = [
                 'pattern' => '^.*$',
                 'http'    => true,
                 'users'   => $userHashes,
-            ],
-        ];
+            ];
+        }
 
-        $app->extend('finder', function (Finder $finder, Application $app) {
+        if (!empty($firewalls)) {
+            $app['security.firewalls'] = $firewalls;
 
-            /** @var array[][] $users */
-            $users = $app['users'];
-            /** @var Request $request */
-            $request = $app['request_stack']->getCurrentRequest();
-            $user    = $request->getUser();
+            $app->extend('finder', function (Finder $finder, Application $app) {
 
-            return $this->applyPermissions($finder, $this->getPermissions($users, $user));
-        });
+                /** @var array[][] $users */
+                $users = $app['users'];
+                $ips = $app['ips'];
+                /** @var Request $request */
+                $request = $app['request_stack']->getCurrentRequest();
+                $user    = $request->getUser();
+                $ip      = $request->getClientIp();
+
+                if (empty($user)) {
+                    $haystack = $ips;
+                    $needle = $ip;
+                } else {
+                    $haystack = $users;
+                    $needle = $user;
+                }
+
+                return $this->applyPermissions($finder, $this->getPermissions($haystack, $needle));
+            });
+        }
     }
 
     protected function getUserHashes(Application $app)
@@ -63,12 +82,12 @@ class AuthenticationProvider implements ServiceProviderInterface, BootableProvid
         return $users;
     }
 
-    protected function getPermissions(array $users, $user)
+    protected function getPermissions(array $haystack, $needle)
     {
         return [
             // TODO use ?? when bumped requirements to PHP 7.
-            'allow'    => empty($users[$user]['allow']) ? [] : $users[$user]['allow'],
-            'disallow' => empty($users[$user]['disallow']) ? [] : $users[$user]['disallow'],
+            'allow'    => empty($haystack[$needle]['allow']) ? [] : $haystack[$needle]['allow'],
+            'disallow' => empty($haystack[$needle]['disallow']) ? [] : $haystack[$needle]['disallow'],
         ];
     }
 
